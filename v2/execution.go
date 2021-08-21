@@ -31,6 +31,11 @@ type Execution struct {
 	execType int
 }
 
+type CaseExecution struct {
+	Execution *Execution
+	Case func() bool
+}
+
 func (e *Execution) parallelExec(ctx context.Context) ([]error, error) {
 	var futures []TaskFuture
 	var ret []error
@@ -84,6 +89,15 @@ func (e *Execution) ExecuteParallel(tasks ...*Task) *Execution {
 
 func (e *Execution) ExecuteSerial(tasks ...*Task) *Execution {
 	return e.nextExecution(tasks, executionTypeSerial)
+}
+
+func (e *Execution) Switch(defaultExec *Execution, cases ...CaseExecution) *Execution {
+	for i := range cases {
+		if cases[i].Case() {
+			return cases[i].Execution
+		}
+	}
+	return defaultExec
 }
 
 func (e *Execution) Async(ctx context.Context, executor TaskExecutor, callback func(*ExecutionResultIterator, error)) {
@@ -140,4 +154,13 @@ func ExecuteSerial(tasks ...*Task) *Execution {
 		tasks:    tasks,
 		execType: executionTypeSerial,
 	}
+}
+
+func Switch(defaultExec *Execution, cases ...CaseExecution) *Execution {
+	for i := range cases {
+		if cases[i].Case() {
+			return cases[i].Execution
+		}
+	}
+	return defaultExec
 }

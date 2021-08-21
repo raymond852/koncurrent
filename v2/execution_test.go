@@ -387,7 +387,7 @@ func TestCascade_SerialAfterParallelAfterParallel(t *testing.T) {
 				assertNil(t, results[1])
 			} else if i == 2 {
 				assertNil(t, results[0])
-				assertNil(t,  results[1])
+				assertNil(t, results[1])
 			}
 			i++
 		}
@@ -457,4 +457,38 @@ func TestExecution_Async(t *testing.T) {
 			})
 		wg.Wait()
 	}
+}
+
+func TestExecution_Switch(t *testing.T) {
+	var taskResult string
+	var defaultCase = NewTask(func(ctx context.Context) error {
+		taskResult = "default"
+		return nil
+	}, NewAsyncExecutor())
+
+	var case1 = NewTask(func(ctx context.Context) error {
+		taskResult = "case1"
+		return nil
+	}, NewAsyncExecutor())
+
+	var case2 = NewTask(func(ctx context.Context) error {
+		taskResult = "case2"
+		return nil
+	}, NewAsyncExecutor())
+
+	Switch(ExecuteSerial(defaultCase),
+		CaseExecution{
+			Execution: ExecuteSerial(case1),
+			Case: func() bool {
+				return true
+			},
+		},
+		CaseExecution{
+			Execution: ExecuteSerial(case2),
+			Case: func() bool {
+				return false
+			},
+		}).Await(context.Background())
+
+	assertEqual(t, taskResult, "case1")
 }

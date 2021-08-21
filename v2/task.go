@@ -25,3 +25,7 @@ func NewTask(task TaskFunc, executor TaskExecutor) *Task {
 		executor: executor,
 	}
 }
+
+func (t *Task) ToExecution() *Execution {
+	return ExecuteSerial(t)
+}

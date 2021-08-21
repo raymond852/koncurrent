@@ -476,19 +476,67 @@ func TestExecution_Switch(t *testing.T) {
 		return nil
 	}, NewAsyncExecutor())
 
-	Switch(ExecuteSerial(defaultCase),
+	_, _ = Switch(defaultCase.ToExecution(),
 		CaseExecution{
-			Execution: ExecuteSerial(case1),
+			Execution: case1.ToExecution(),
 			Case: func() bool {
 				return true
 			},
 		},
 		CaseExecution{
-			Execution: ExecuteSerial(case2),
+			Execution: case2.ToExecution(),
 			Case: func() bool {
 				return false
 			},
 		}).Await(context.Background())
 
 	assertEqual(t, taskResult, "case1")
+
+	var defaultCase1 = NewTask(func(ctx context.Context) error {
+		taskResult = "defaultCase1"
+		return nil
+	}, NewAsyncExecutor())
+
+	var case3 = NewTask(func(ctx context.Context) error {
+		taskResult = "case3"
+		return nil
+	}, NewAsyncExecutor())
+
+	_, _ = Switch(defaultCase1.ToExecution(), CaseExecution{
+		Execution: case3.ToExecution(),
+		Case: func() bool {
+			return false
+		},
+	}).Await(context.Background())
+
+	assertEqual(t, taskResult, "defaultCase1")
+
+	var firstExec = NewTask(func(ctx context.Context) error {
+		return nil
+	}, NewAsyncExecutor())
+
+	_, _ = ExecuteSerial(firstExec).Switch(defaultCase.ToExecution(),
+		CaseExecution{
+			Execution: case1.ToExecution(),
+			Case: func() bool {
+				return true
+			},
+		},
+		CaseExecution{
+			Execution: case2.ToExecution(),
+			Case: func() bool {
+				return false
+			},
+		}).Await(context.Background())
+
+	assertEqual(t, taskResult, "case1")
+
+	_, _ = ExecuteSerial(firstExec).Switch(defaultCase1.ToExecution(), CaseExecution{
+		Execution: case3.ToExecution(),
+		Case: func() bool {
+			return false
+		},
+	}).Await(context.Background())
+
+	assertEqual(t, taskResult, "defaultCase1")
 }

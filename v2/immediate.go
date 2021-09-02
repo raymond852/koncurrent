@@ -11,14 +11,14 @@ type immediateFuture struct {
 	err error
 }
 
-func (p *immediateFuture) Get() error {
+func (p immediateFuture) Get() error {
 	return p.err
 }
 
 func NewImmediateExecutor() TaskExecutor {
-	return &ImmediateExecutor{}
+	return ImmediateExecutor{}
 }
 
-func (a *ImmediateExecutor) Execute(ctx context.Context, task TaskFunc) TaskFuture {
-	return &immediateFuture{err: task(ctx)}
+func (a ImmediateExecutor) Execute(ctx context.Context, task TaskFunc) TaskFuture {
+	return immediateFuture{err: task(ctx)}
 }

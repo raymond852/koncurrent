@@ -15,7 +15,7 @@ type ExecutionResultIterator struct {
 	results      [][]error
 }
 
-func (it *ExecutionResultIterator) Next() []error {
+func (it ExecutionResultIterator) Next() []error {
 	if it.currentIndex >= len(it.results) {
 		return nil
 	}
@@ -25,22 +25,20 @@ func (it *ExecutionResultIterator) Next() []error {
 }
 
 type Execution struct {
-	root     *Execution
-	next     *Execution
-	tasks    []*Task
-	execType int
+	tasksList         [][]Task
+	executionTypeList []int
 }
 
 type CaseExecution struct {
-	Execution *Execution
-	Case func() bool
+	Execution Execution
+	Case      func() bool
 }
 
-func (e *Execution) parallelExec(ctx context.Context) ([]error, error) {
+func parallelExec(ctx context.Context, tasks []Task) ([]error, error) {
 	var futures []TaskFuture
 	var ret []error
-	for i := range e.tasks {
-		futures = append(futures, e.tasks[i].executor.Execute(ctx, e.tasks[i].taskFunc))
+	for i := range tasks {
+		futures = append(futures, tasks[i].executor.Execute(ctx, tasks[i].taskFunc))
 	}
 	var err error
 	for i := range futures {
@@ -55,10 +53,10 @@ func (e *Execution) parallelExec(ctx context.Context) ([]error, error) {
 	return ret, err
 }
 
-func (e *Execution) serialExec(ctx context.Context) ([]error, error) {
+func serialExec(ctx context.Context, tasks []Task) ([]error, error) {
 	var ret []error
-	for i := range e.tasks {
-		resultErr := e.tasks[i].executor.Execute(ctx, e.tasks[i].taskFunc).Get()
+	for i := range tasks {
+		resultErr := tasks[i].executor.Execute(ctx, tasks[i].taskFunc).Get()
 		ret = append(ret, resultErr)
 		if resultErr != nil {
 			return ret, resultErr
@@ -67,31 +65,22 @@ func (e *Execution) serialExec(ctx context.Context) ([]error, error) {
 	return ret, nil
 }
 
-func (e *Execution) nextExecution(tasks []*Task, executionType int) *Execution {
-	ret := &Execution{
-		root:     nil,
-		next:     nil,
-		tasks:    tasks,
-		execType: executionType,
+func (e Execution) nextExecution(tasks []Task, executionType int) Execution {
+	return Execution{
+		tasksList: append(e.tasksList, tasks),
+		executionTypeList: append(e.executionTypeList, executionType),
 	}
-	if e.root == nil {
-		ret.root = e
-	} else {
-		ret.root = e.root
-	}
-	e.next = ret
-	return ret
 }
 
-func (e *Execution) ExecuteParallel(tasks ...*Task) *Execution {
+func (e Execution) ExecuteParallel(tasks ...Task) Execution {
 	return e.nextExecution(tasks, executionTypeParallel)
 }
 
-func (e *Execution) ExecuteSerial(tasks ...*Task) *Execution {
+func (e Execution) ExecuteSerial(tasks ...Task) Execution {
 	return e.nextExecution(tasks, executionTypeSerial)
 }
 
-func (e *Execution) Switch(defaultExec *Execution, cases ...CaseExecution) *Execution {
+func (e Execution) Switch(defaultExec Execution, cases ...CaseExecution) Execution {
 	for i := range cases {
 		if cases[i].Case() {
 			return cases[i].Execution
@@ -100,7 +89,7 @@ func (e *Execution) Switch(defaultExec *Execution, cases ...CaseExecution) *Exec
 	return defaultExec
 }
 
-func (e *Execution) Async(ctx context.Context, executor TaskExecutor, callback func(*ExecutionResultIterator, error)) {
+func (e Execution) Async(ctx context.Context, executor TaskExecutor, callback func(ExecutionResultIterator, error)) {
 	var execTaskFunc TaskFunc = func(ctx context.Context) error {
 		result, err := e.Await(ctx)
 		if callback != nil {
@@ -111,52 +100,40 @@ func (e *Execution) Async(ctx context.Context, executor TaskExecutor, callback f
 	_ = executor.Execute(ctx, execTaskFunc)
 }
 
-func (e *Execution) Await(ctx context.Context) (*ExecutionResultIterator, error) {
-	iter := e.root
-	if e.root == nil {
-		iter = e
-	}
-	ret := &ExecutionResultIterator{}
+func (e Execution) Await(ctx context.Context) (ExecutionResultIterator, error) {
+	ret := ExecutionResultIterator{}
 	var err error
-	for {
+	for i := range e.tasksList {
 		var execErr []error
-		switch iter.execType {
+		switch e.executionTypeList[i] {
 		case executionTypeParallel:
-			execErr, err = iter.parallelExec(ctx)
+			execErr, err = parallelExec(ctx, e.tasksList[i])
 		default:
-			execErr, err = iter.serialExec(ctx)
+			execErr, err = serialExec(ctx, e.tasksList[i])
 		}
 		ret.results = append(ret.results, execErr)
 		if err != nil {
-			break
-		}
-		iter = iter.next
-		if iter == nil {
 			break
 		}
 	}
 	return ret, err
 }
 
-func ExecuteParallel(tasks ...*Task) *Execution {
-	return &Execution{
-		root:     nil,
-		next:     nil,
-		tasks:    tasks,
-		execType: executionTypeParallel,
+func ExecuteParallel(tasks ...Task) Execution {
+	return Execution{
+		tasksList: [][]Task{tasks},
+		executionTypeList: []int{executionTypeParallel},
 	}
 }
 
-func ExecuteSerial(tasks ...*Task) *Execution {
-	return &Execution{
-		root:     nil,
-		next:     nil,
-		tasks:    tasks,
-		execType: executionTypeSerial,
+func ExecuteSerial(tasks ...Task) Execution {
+	return Execution{
+		tasksList: [][]Task{tasks},
+		executionTypeList: []int{executionTypeSerial},
 	}
 }
 
-func Switch(defaultExec *Execution, cases ...CaseExecution) *Execution {
+func Switch(defaultExec Execution, cases ...CaseExecution) Execution {
 	for i := range cases {
 		if cases[i].Case() {
 			return cases[i].Execution

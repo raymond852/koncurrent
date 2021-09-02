@@ -19,13 +19,13 @@ type Task struct {
 	executor TaskExecutor
 }
 
-func NewTask(task TaskFunc, executor TaskExecutor) *Task {
-	return &Task{
+func NewTask(task TaskFunc, executor TaskExecutor) Task {
+	return Task{
 		taskFunc: task,
 		executor: executor,
 	}
 }
 
-func (t *Task) ToExecution() *Execution {
+func (t Task) ToExecution() Execution {
 	return ExecuteSerial(t)
 }

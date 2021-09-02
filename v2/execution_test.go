@@ -3,7 +3,6 @@ package koncurrent
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -137,9 +136,7 @@ func TestExecuteParallel_Error(t *testing.T) {
 	executors := []TaskExecutor{NewPoolExecutor(20, 20), NewAsyncExecutor()}
 	for i := range executors {
 		iter, err := ExecuteParallel(NewTask(t1, executors[i]), NewTask(t2, executors[i]), NewTask(t3, executors[i]), NewTask(t4, executors[i])).Await(context.Background())
-		assertNotNil(t, iter)
 		results := iter.Next()
-		fmt.Println(fmt.Errorf("err %w", err))
 		assertNotNil(t, err)
 		assertEqual(t, 4, len(results))
 		assertNotNil(t, time1)
@@ -427,7 +424,7 @@ func TestExecution_Async(t *testing.T) {
 		wg.Add(1)
 		ExecuteParallel(NewTask(t1, executors[i]), NewTask(t2, executors[i])).
 			ExecuteSerial(NewTask(t3, executors[i]), NewTask(t4, executors[i])).
-			Async(context.Background(), executors[i], func(iter *ExecutionResultIterator, err error) {
+			Async(context.Background(), executors[i], func(iter ExecutionResultIterator, err error) {
 				assertNil(t, err)
 				i := 0
 				for {
@@ -540,3 +537,4 @@ func TestExecution_Switch(t *testing.T) {
 
 	assertEqual(t, taskResult, "defaultCase1")
 }
+

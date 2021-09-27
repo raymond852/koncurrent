@@ -101,17 +101,39 @@ func (e Execution) Async(ctx context.Context, executor TaskExecutor, callback fu
 }
 
 func (e Execution) Await(ctx context.Context) (ExecutionResultIterator, error) {
-	ret := ExecutionResultIterator{}
+	ret := ExecutionResultIterator{
+		currentIndex: 0,
+		results:      make([][]error, len(e.tasksList)),
+	}
 	var err error
 	for i := range e.tasksList {
-		var execErr []error
+		execErr := make([]error, len(e.tasksList[i]))
 		switch e.executionTypeList[i] {
 		case executionTypeParallel:
-			execErr, err = parallelExec(ctx, e.tasksList[i])
+			futures := make([]TaskFuture, len(e.tasksList[i]))
+			for j, task := range e.tasksList[i] {
+				futures[j] = task.executor.Execute(ctx, task.taskFunc)
+			}
+			for i := range futures {
+				resultErr := futures[i].Get()
+				if err == nil {
+					err = resultErr
+				} else {
+					err = fmt.Errorf("%s:%w", resultErr, err)
+				}
+				execErr[i] = resultErr
+			}
 		default:
-			execErr, err = serialExec(ctx, e.tasksList[i])
+			for _, task := range e.tasksList[i] {
+				resultErr := task.executor.Execute(ctx, task.taskFunc).Get()
+				execErr[i] = resultErr
+				ret.results[i] = execErr
+				if resultErr != nil {
+					return ret, resultErr
+				}
+			}
+			return ret, nil
 		}
-		ret.results = append(ret.results, execErr)
 		if err != nil {
 			break
 		}

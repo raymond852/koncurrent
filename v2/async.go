@@ -2,7 +2,7 @@ package koncurrent
 
 import "context"
 
-var instance AsyncExecutor
+var instance = AsyncExecutor{}
 
 type AsyncExecutor struct {
 }

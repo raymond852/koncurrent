@@ -25,7 +25,7 @@ func TestExecuteSerial(t *testing.T) {
 	executors := []TaskExecutor{NewPoolExecutor(20, 20), NewAsyncExecutor(), NewImmediateExecutor()}
 	for i := range executors {
 		iter, err := ExecuteSerial(NewTask(t1, executors[i]), NewTask(t2, executors[i])).Await(context.Background())
-		results := iter.Next()
+		results := iter[0]
 		assertNil(t, err)
 		assertEqual(t, 2, len(results))
 		assertNotNil(t, time1)
@@ -54,9 +54,9 @@ func TestExecuteSerial_CanAbortWithError(t *testing.T) {
 	executors := []TaskExecutor{NewPoolExecutor(20, 20), NewAsyncExecutor(), NewImmediateExecutor()}
 	for i := range executors {
 		iter, err := ExecuteSerial(NewTask(t1, executors[i]), NewTask(t2, executors[i]), NewTask(t3, executors[i])).Await(context.Background())
-		resultErrors := iter.Next()
+		resultErrors := iter[0]
 		assertNotNil(t, err)
-		assertEqual(t, 2, len(resultErrors))
+		assertNil(t, resultErrors[2])
 		assertNotNil(t, time1)
 		assertNil(t, time3)
 		assertNotNil(t, resultErrors[1])
@@ -79,9 +79,8 @@ func TestExecuteParallel(t *testing.T) {
 		iter, err := ExecuteParallel(NewTask(t1, executors[i]), NewTask(t2, executors[i])).Await(context.Background())
 		elapse := time.Now().Sub(now)
 		assertTrue(t, elapse < 5100*time.Millisecond)
-		resultErrors := iter.Next()
+		resultErrors := iter[0]
 		assertNil(t, err)
-		assertEqual(t, 2, len(resultErrors))
 		assertNil(t, resultErrors[0])
 		assertNil(t, resultErrors[1])
 	}
@@ -103,7 +102,7 @@ func TestExecuteParallel_ImmediateExecutor(t *testing.T) {
 	}
 
 	iter, err := ExecuteParallel(NewTask(t1, NewImmediateExecutor()), NewTask(t2, NewImmediateExecutor())).Await(context.Background())
-	results := iter.Next()
+	results := iter[0]
 	assertNil(t, err)
 	assertEqual(t, 2, len(results))
 	assertNotNil(t, time1)
@@ -136,7 +135,7 @@ func TestExecuteParallel_Error(t *testing.T) {
 	executors := []TaskExecutor{NewPoolExecutor(20, 20), NewAsyncExecutor()}
 	for i := range executors {
 		iter, err := ExecuteParallel(NewTask(t1, executors[i]), NewTask(t2, executors[i]), NewTask(t3, executors[i]), NewTask(t4, executors[i])).Await(context.Background())
-		results := iter.Next()
+		results := iter[0]
 		assertNotNil(t, err)
 		assertEqual(t, 4, len(results))
 		assertNotNil(t, time1)
@@ -181,11 +180,7 @@ func TestCascade_SerialAfterParallel(t *testing.T) {
 			Await(context.Background())
 		assertNil(t, err)
 		i := 0
-		for {
-			results := iter.Next()
-			if results == nil {
-				break
-			}
+		for _, results := range iter {
 			assertEqual(t, 2, len(results))
 			assertNotNil(t, time1)
 			assertNotNil(t, time2)
@@ -240,11 +235,7 @@ func TestCascade_ParallelAfterSerial(t *testing.T) {
 			Await(context.Background())
 		assertNil(t, err)
 		i := 0
-		for {
-			results := iter.Next()
-			if results == nil {
-				break
-			}
+		for _, results := range iter {
 			assertEqual(t, 2, len(results))
 			assertNotNil(t, time1)
 			assertNotNil(t, time2)
@@ -295,21 +286,11 @@ func TestCascade_SerialAfterParallelError(t *testing.T) {
 			ExecuteParallel(NewTask(t3, executors[i]), NewTask(t4, executors[i])).
 			Await(context.Background())
 		assertNotNil(t, err)
-		i := 0
-		for {
-			results := iter.Next()
-			if results == nil {
-				break
-			}
-			assertEqual(t, 2, len(results))
-			assertNotNil(t, time1)
-			assertNil(t, time3)
-			assertNil(t, time4)
-			assertNil(t, results[0])
-			assertNotNil(t, results[1])
-			i++
-		}
-		assertEqual(t, 1, i)
+		assertEqual(t, 2, len(iter[0]))
+		assertNil(t, iter[1])
+		assertNotNil(t, time1)
+		assertNil(t, time3)
+		assertNil(t, time4)
 	}
 }
 
@@ -359,11 +340,7 @@ func TestCascade_SerialAfterParallelAfterParallel(t *testing.T) {
 			Await(context.Background())
 		assertNil(t, err)
 		i := 0
-		for {
-			results := iter.Next()
-			if results == nil {
-				break
-			}
+		for _, results := range iter {
 			assertEqual(t, 2, len(results))
 			assertNotNil(t, time1)
 			assertNotNil(t, time2)
@@ -424,14 +401,10 @@ func TestExecution_Async(t *testing.T) {
 		wg.Add(1)
 		ExecuteParallel(NewTask(t1, executors[i]), NewTask(t2, executors[i])).
 			ExecuteSerial(NewTask(t3, executors[i]), NewTask(t4, executors[i])).
-			Async(context.Background(), executors[i], func(iter ExecutionResultIterator, err error) {
+			Async(context.Background(), executors[i], func(iter ExecutionResults, err error) {
 				assertNil(t, err)
 				i := 0
-				for {
-					results := iter.Next()
-					if results == nil {
-						break
-					}
+				for _, results := range iter {
 					assertEqual(t, 2, len(results))
 					assertNotNil(t, time1)
 					assertNotNil(t, time2)
@@ -537,4 +510,3 @@ func TestExecution_Switch(t *testing.T) {
 
 	assertEqual(t, taskResult, "defaultCase1")
 }
-

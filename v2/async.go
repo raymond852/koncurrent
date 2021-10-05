@@ -2,8 +2,6 @@ package koncurrent
 
 import "context"
 
-var instance = AsyncExecutor{}
-
 type AsyncExecutor struct {
 }
 
@@ -24,6 +22,6 @@ func (a AsyncExecutor) Execute(ctx context.Context, task TaskFunc) TaskFuture {
 	return channelTaskFuture{chn: chn}
 }
 
-func NewAsyncExecutor() TaskExecutor {
-	return instance
+func NewAsyncExecutor() AsyncExecutor {
+	return AsyncExecutor{}
 }

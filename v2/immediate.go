@@ -15,7 +15,7 @@ func (p immediateFuture) Get() error {
 	return p.err
 }
 
-func NewImmediateExecutor() TaskExecutor {
+func NewImmediateExecutor() ImmediateExecutor {
 	return ImmediateExecutor{}
 }
 

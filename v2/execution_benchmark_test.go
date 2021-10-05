@@ -21,7 +21,7 @@ func BenchmarkExecuteSerial_Immediate(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteSerial(task1Func.Immediate(), task2Func.Immediate(), task3Func.Immediate()).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
 	}
 }
 
@@ -39,7 +39,7 @@ func BenchmarkExecuteSerial_Async(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteSerial(task1Func.Async(), task2Func.Async(), task3Func.Async()).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, NewAsyncExecutor()), NewTask(task2Func, NewAsyncExecutor()), NewTask(task3Func, NewAsyncExecutor())).Await(context.Background())
 	}
 }
 
@@ -57,7 +57,7 @@ func BenchmarkExecuteSerial_Pool(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteSerial(task1Func.Pool(pe), task2Func.Pool(pe), task3Func.Pool(pe)).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
 	}
 }
 
@@ -75,7 +75,7 @@ func BenchmarkExecuteParallel_Immediate(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteSerial(task1Func.Immediate(), task2Func.Immediate(), task3Func.Immediate()).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
 	}
 }
 
@@ -93,7 +93,7 @@ func BenchmarkExecuteParallel_Async(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteParallel(task1Func.Async(), task2Func.Async(), task3Func.Async()).Await(context.Background())
+		_, _ = ExecuteParallel(NewTask(task1Func, NewAsyncExecutor()), NewTask(task2Func, NewAsyncExecutor()), NewTask(task3Func, NewAsyncExecutor())).Await(context.Background())
 	}
 }
 
@@ -111,6 +111,6 @@ func BenchmarkExecuteParallel_Pool(b *testing.B) {
 			return nil
 		}
 
-		_, _ = ExecuteSerial(task1Func.Pool(pe), task2Func.Pool(pe), task3Func.Pool(pe)).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
 	}
 }

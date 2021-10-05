@@ -75,7 +75,7 @@ func BenchmarkExecuteParallel_Immediate(b *testing.B) {
 			return NewTaskResult(nil, nil)
 		}
 
-		_, _ = ExecuteSerial(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
+		_, _ = ExecuteParallel(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
 	}
 }
 
@@ -111,6 +111,6 @@ func BenchmarkExecuteParallel_Pool(b *testing.B) {
 			return NewTaskResult(nil, nil)
 		}
 
-		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
+		_, _ = ExecuteParallel(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
 	}
 }

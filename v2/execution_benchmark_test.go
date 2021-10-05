@@ -5,39 +5,112 @@ import (
 	"testing"
 )
 
-func BenchmarkExecuteSerial(b *testing.B) {
+var pe = NewPoolExecutor(2, 10)
+
+func BenchmarkExecuteSerial_Immediate(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		var task1 = NewTask(func(ctx context.Context) error {
+		var task1Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		var task2 = NewTask(func(ctx context.Context) error {
+		var task2Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		var task3 = NewTask(func(ctx context.Context) error {
+		var task3Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		_,_ = ExecuteParallel(task1, task2, task3).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
 	}
 }
 
-func BenchmarkExecuteParallel(b *testing.B) {
+func BenchmarkExecuteSerial_Async(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		var task1 = NewTask(func(ctx context.Context) error {
+		var task1Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		var task2 = NewTask(func(ctx context.Context) error {
+		var task2Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		var task3 = NewTask(func(ctx context.Context) error {
+		var task3Func TaskFunc = func(ctx context.Context) error {
 			return nil
-		}, NewAsyncExecutor())
+		}
 
-		_,_ = ExecuteParallel(task1, task2, task3).Await(context.Background())
+		_, _ = ExecuteSerial(NewTask(task1Func, NewAsyncExecutor()), NewTask(task2Func, NewAsyncExecutor()), NewTask(task3Func, NewAsyncExecutor())).Await(context.Background())
 	}
 }
 
+func BenchmarkExecuteSerial_Pool(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		var task1Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task2Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task3Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
+	}
+}
+
+func BenchmarkExecuteParallel_Immediate(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		var task1Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task2Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task3Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		_, _ = ExecuteSerial(NewTask(task1Func, NewImmediateExecutor()), NewTask(task2Func, NewImmediateExecutor()), NewTask(task3Func, NewImmediateExecutor())).Await(context.Background())
+	}
+}
+
+func BenchmarkExecuteParallel_Async(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		var task1Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task2Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task3Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		_, _ = ExecuteParallel(NewTask(task1Func, NewAsyncExecutor()), NewTask(task2Func, NewAsyncExecutor()), NewTask(task3Func, NewAsyncExecutor())).Await(context.Background())
+	}
+}
+
+func BenchmarkExecuteParallel_Pool(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		var task1Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task2Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		var task3Func TaskFunc = func(ctx context.Context) error {
+			return nil
+		}
+
+		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
+	}
+}

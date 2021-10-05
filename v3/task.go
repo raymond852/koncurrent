@@ -12,16 +12,19 @@ const (
 
 type TaskFunc func(ctx context.Context) error
 
-type TaskFuture chan error
-
-type TaskExecutor interface {
-	Execute(ctx context.Context, task TaskFunc) TaskFuture
+type TaskResult struct {
+	err error
+	id  int
 }
 
 type TaskExecution struct {
 	executionType int
 	taskFunc      TaskFunc
-	executor      TaskExecutor
+	executor      PoolExecutor
+}
+
+func (t TaskExecution) Execution() Execution {
+	return ExecuteSerial(t)
 }
 
 func (t TaskFunc) Immediate() TaskExecution {

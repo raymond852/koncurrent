@@ -10,18 +10,18 @@ type PoolExecutor struct {
 
 type taskContext struct {
 	context.Context
-	task   TaskFunc
-	result chan error
+	task      TaskFunc
+	taskId    int
+	resultChn chan TaskResult
 }
 
-func (p PoolExecutor) Execute(ctx context.Context, task TaskFunc) TaskFuture {
-	chn := make(chan error, 1)
+func (p PoolExecutor) Execute(ctx context.Context, task TaskFunc, taskId int, resultChn chan TaskResult) {
 	p.queue <- taskContext{
-		Context: ctx,
-		task:    task,
-		result:  chn,
+		Context:   ctx,
+		task:      task,
+		taskId:    taskId,
+		resultChn: resultChn,
 	}
-	return chn
 }
 
 func NewPoolExecutor(poolSize int, queueSize int) PoolExecutor {
@@ -32,8 +32,11 @@ func NewPoolExecutor(poolSize int, queueSize int) PoolExecutor {
 		go func() {
 			for {
 				taskCtx := <-ret.queue
-				result := taskCtx.task(taskCtx.Context)
-				taskCtx.result <- result
+				taskErr := taskCtx.task(taskCtx.Context)
+				taskCtx.resultChn <- TaskResult{
+					err: taskErr,
+					id:  taskCtx.taskId,
+				}
 			}
 		}()
 	}

@@ -75,7 +75,7 @@ func TestExecuteSerial_CanAbortWithError(t *testing.T) {
 
 func TestExecuteParallel(t *testing.T) {
 	var t1 TaskFunc = func(ctx context.Context) error {
-		time.Sleep(5000 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 		return nil
 	}
 	var t2 TaskFunc = func(ctx context.Context) error {
@@ -92,7 +92,7 @@ func TestExecuteParallel(t *testing.T) {
 		now := time.Now()
 		iter, err := ExecuteParallel(taskExecs[i]...).Await(context.Background())
 		elapse := time.Now().Sub(now)
-		assertTrue(t, elapse < 5100*time.Millisecond)
+		assertTrue(t, elapse < 1100*time.Millisecond)
 		resultErrors := iter[0]
 		assertNil(t, err)
 		assertNil(t, resultErrors[0])
@@ -181,7 +181,6 @@ func TestCascade_SerialAfterParallel(t *testing.T) {
 	}
 	var t3 TaskFunc = func(ctx context.Context) error {
 		time.Sleep(100 * time.Millisecond)
-		println("run3")
 		now := time.Now()
 		time3 = &now
 		return nil
@@ -460,6 +459,66 @@ func TestExecution_Async(t *testing.T) {
 	}
 }
 
+func TestExecuteParallel_WithCancel(t *testing.T) {
+	outer := 1
+	var task1 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		outer = 2
+		return nil
+	}
+
+	var task2 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		return nil
+	}
+
+	var task3 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	begin := time.Now()
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+	_, _ = ExecuteParallel(task1.Pool(pe), task2.Async(), task3.Async()).Await(ctx)
+	elapsed := time.Now().Sub(begin)
+	assertEqual(t, outer, 1)
+	assertTrue(t, elapsed < 1000*time.Millisecond)
+}
+
+func TestExecuteSerial_WithCancel(t *testing.T) {
+	outer := 1
+	var task1 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		outer = 2
+		return nil
+	}
+
+	var task2 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		return nil
+	}
+
+	var task3 TaskFunc = func(ctx context.Context) error {
+		time.Sleep(1000 * time.Millisecond)
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	begin := time.Now()
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+	_, _ = ExecuteSerial(task1.Pool(pe), task2.Async(), task3.Async()).Await(ctx)
+	elapsed := time.Now().Sub(begin)
+	assertEqual(t, outer, 1)
+	assertTrue(t, elapsed < 1000*time.Millisecond)
+}
+
 func TestExecution_Switch(t *testing.T) {
 	var taskResult string
 	var defaultCase TaskFunc = func(ctx context.Context) error {
@@ -477,15 +536,15 @@ func TestExecution_Switch(t *testing.T) {
 		return nil
 	}
 
-	_, _ = Switch(ExecuteSerial(defaultCase.Async()),
+	_, _ = Switch(defaultCase.Async().Execution(),
 		CaseExecution{
-			Execution: ExecuteSerial(case1.Async()),
+			Execution: case1.Async().Execution(),
 			Case: func() bool {
 				return true
 			},
 		},
 		CaseExecution{
-			Execution: ExecuteSerial(case2.Async()),
+			Execution: case2.Async().Execution(),
 			Case: func() bool {
 				return false
 			},
@@ -503,8 +562,8 @@ func TestExecution_Switch(t *testing.T) {
 		return nil
 	}
 
-	_, _ = Switch(ExecuteSerial(defaultCase1.Async()), CaseExecution{
-		Execution: ExecuteSerial(case3.Async()),
+	_, _ = Switch(defaultCase1.Async().Execution(), CaseExecution{
+		Execution: case3.Async().Execution(),
 		Case: func() bool {
 			return false
 		},
@@ -516,28 +575,31 @@ func TestExecution_Switch(t *testing.T) {
 		return nil
 	}
 
-	_, _ = ExecuteSerial(firstExec.Async()).Switch(ExecuteSerial(defaultCase.Async()),
-		CaseExecution{
-			Execution: ExecuteSerial(case1.Async()),
-			Case: func() bool {
-				return true
+	_, _ = firstExec.Async().Execution().
+		Switch(defaultCase.Async().Execution(),
+			CaseExecution{
+				Execution: case1.Async().Execution(),
+				Case: func() bool {
+					return true
+				},
 			},
-		},
-		CaseExecution{
-			Execution: ExecuteSerial(case1.Async()),
-			Case: func() bool {
-				return false
-			},
-		}).Await(context.Background())
+			CaseExecution{
+				Execution: case2.Async().Execution(),
+				Case: func() bool {
+					return false
+				},
+			}).Await(context.Background())
 
 	assertEqual(t, taskResult, "case1")
 
-	_, _ = ExecuteSerial(firstExec.Async()).Switch(ExecuteSerial(defaultCase1.Async()), CaseExecution{
-		Execution: ExecuteSerial(case3.Async()),
-		Case: func() bool {
-			return false
-		},
-	}).Await(context.Background())
+	_, _ = firstExec.Async().Execution().
+		Switch(defaultCase1.Async().Execution(),
+			CaseExecution{
+				Execution: case3.Async().Execution(),
+				Case: func() bool {
+					return false
+				},
+			}).Await(context.Background())
 
 	assertEqual(t, taskResult, "defaultCase1")
 }

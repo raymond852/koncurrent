@@ -64,54 +64,77 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 		ret[i] = execErr
 		switch e.executionTypeList[i] {
 		case executionTypeParallel:
-			futures := make([]TaskFuture, len(currTaskList))
+			resultsChn := make(chan TaskResult, len(currTaskList))
 			for j, task := range currTaskList {
+				taskFunc := task.taskFunc
 				if task.executionType == taskExecutionTypeImmediate {
-					futures[j] = make(chan error, 1)
-					futures[j] <- task.taskFunc(ctx)
+					resultsChn <- TaskResult{
+						err: taskFunc(ctx),
+						id:  j,
+					}
 				} else if task.executionType == taskExecutionTypeNewGoRoutine {
-					chn := make(chan error)
-					taskFunc :=  task.taskFunc
+					index := j
 					go func() {
-						chn <- taskFunc(ctx)
+						resultsChn <- TaskResult{
+							err: taskFunc(ctx),
+							id:  index,
+						}
 					}()
-					futures[j] = chn
 				} else {
-					futures[j] = task.executor.Execute(ctx, task.taskFunc)
+					task.executor.Execute(ctx, task.taskFunc, j, resultsChn)
 				}
 			}
-			for j := range futures {
-				resultErr := <- futures[j]
-				close(futures[j])
-				if err == nil {
-					err = resultErr
-				} else {
-					err = fmt.Errorf("%s:%w", resultErr, err)
+			for range currTaskList {
+				select {
+				case taskResult := <-resultsChn:
+					execErr[taskResult.id] = taskResult.err
+				case <-ctx.Done():
+					return ret, err
 				}
-				execErr[j] = resultErr
+			}
+			close(resultsChn)
+			for j := range execErr {
+				if execErr[j] != nil {
+					if err == nil {
+						err = execErr[j]
+					} else {
+						err = fmt.Errorf("%s:%w", execErr[j], err)
+					}
+				}
 			}
 		default:
-			chn := make(chan error)
+			resultsChn := make(chan TaskResult)
 			for j, task := range currTaskList {
-				var resultErr error
+				taskFunc := task.taskFunc
 				if task.executionType == taskExecutionTypeImmediate {
-					resultErr = task.taskFunc(ctx)
+					execErr[j] = taskFunc(ctx)
 				} else if task.executionType == taskExecutionTypeNewGoRoutine {
-					taskFunc :=  task.taskFunc
 					go func() {
-						chn <- taskFunc(ctx)
+						resultsChn <- TaskResult{
+							err: taskFunc(ctx),
+						}
 					}()
-					resultErr = <-chn
+					select {
+					case taskResult := <-resultsChn:
+						execErr[j] = taskResult.err
+					case <-ctx.Done():
+						return ret, err
+					}
 				} else {
-					resultErr = <-task.executor.Execute(ctx, task.taskFunc)
+					task.executor.Execute(ctx, task.taskFunc, j, resultsChn)
+					select {
+					case taskResult := <-resultsChn:
+						execErr[j] = taskResult.err
+					case <-ctx.Done():
+						return ret, err
+					}
 				}
-				execErr[j] = resultErr
-				if resultErr != nil {
-					close(chn)
-					return ret, resultErr
+				if execErr[j] != nil {
+					close(resultsChn)
+					return ret, execErr[j]
 				}
 			}
-			close(chn)
+			close(resultsChn)
 		}
 		if err != nil {
 			break

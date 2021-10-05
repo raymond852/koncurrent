@@ -1,63 +1,56 @@
 ## Introduction
-A Go lib for easier concurrency control. Inspired by ReactiveX and javascript Promise
+A Go lib for easier concurrency control. Inspired by ReactiveX and javascript Promise.
 
-### Executor Types
-* Immediate executor. Immediate executor will execute the task on current go routine
-* Async executor. Async executor will execute the task on new go routine
-* Pool executor. Pool executor will spawn a fixed size go routine pool, all the tasks will be executed by the go routine in the pool
+The v3 library dramatically improve performance than v2 and v1 library by reducing the heap memory allocation.
 
 ### Usage
 #### Simple execution example
 ```go
-    var time1, time2 *time.Time
+    var time1, time2 time.Time
     var t1 koncurrent.TaskFunc = func(ctx context.Context) error {
         time.Sleep(100 * time.Millisecond)
-        now := time.Now()
-        time1 = &now
+        time1 = time.Now()
         return nil
     }
-	var t2 koncurrent.TaskFunc = func(ctx context.Context) error {
-		time.Sleep(100 * time.Millisecond)
-		now := time.Now()
-		time2 = &now
-		return nil
-	}
-    // although the below tries to execute in parallel, but since immediate executor is being used, so t2 will execute after t1 finished
-    koncurrent.ExecuteParallel(koncurrent.NewTask(t1, koncurrent.NewImmediateExecutor()), koncurrent.NewTask(t2, koncurrent.NewImmediateExecutor()))
+    var t2 koncurrent.TaskFunc = func(ctx context.Context) error {
+        time.Sleep(100 * time.Millisecond)
+        time2 = time.Now()
+        return nil
+    }
+    errIter, err := koncurrent.ExecuteParallel(t1.Async(), t2.Immediate()).Await(context.Background())
+    fmt.Println(errIter)
+    fmt.Println(err)
 ```
 #### Cascaded execution example
 ```go
-	var time1, time2, time3, time4 *time.Time
-	var t1 koncurrent.TaskFunc = func(ctx context.Context) error {
-		time.Sleep(100 * time.Millisecond)
-		now := time.Now()
-		time1 = &now
-		return nil
-	}
-	var t2 koncurrent.TaskFunc = func(ctx context.Context) error {
-		time.Sleep(100 * time.Millisecond)
-		now := time.Now()
-		time2 = &now
-		return nil
-	}
-	var t3 koncurrent.TaskFunc = func(ctx context.Context) error {
-		time.Sleep(100 * time.Millisecond)
-		now := time.Now()
-		time3 = &now
-		return nil
-	}
-	var t4 koncurrent.TaskFunc = func(ctx context.Context) error {
-		time.Sleep(100 * time.Millisecond)
-		now := time.Now()
-		time4 = &now
-		return errors.New("task 4 error occur")
-	}
-	executors := []koncurrent.TaskExecutor{koncurrent.NewPoolExecutor(20, 20), koncurrent.NewAsyncExecutor()}
-	for i := range executors {
-		errIter, err := koncurrent.ExecuteSerial(koncurrent.NewTask(t1, executors[i]), koncurrent.NewTask(t2, executors[i])).
-			ExecuteParallel(koncurrent.NewTask(t3, executors[i]), koncurrent.NewTask(t4, executors[i])).
-			Await(context.Background())
-		fmt.Println(errIter)
-		fmt.Println(err)
-	}
+    var time1, time2, time3, time4 time.Time
+    var t1 koncurrent.TaskFunc = func(ctx context.Context) error {
+        time.Sleep(100 * time.Millisecond)
+        time1 = time.Now()
+        return nil
+    }
+    var t2 koncurrent.TaskFunc = func(ctx context.Context) error {
+        time.Sleep(100 * time.Millisecond)
+        time2 = time.Now()
+        return nil
+    }
+    var t3 koncurrent.TaskFunc = func(ctx context.Context) error {
+        time.Sleep(100 * time.Millisecond)
+        tim3 = time.Now()
+        return nil
+    }
+    var t4 koncurrent.TaskFunc = func(ctx context.Context) error {
+        time.Sleep(100 * time.Millisecond)
+        time4 = time.Now()
+        return errors.New("task 4 error occur")
+    }
+    pe := koncurrent.NewPoolExecutor(20, 20)
+    for i := range executors {
+        errIter, err := koncurrent.ExecuteSerial(t1.Pool(pe), t2.Async()).
+            ExecuteParallel(t3.Pool(pe), t4.Pool(pe)).
+            Await(context.Background())
+        fmt.Println(errIter)
+        fmt.Println(err)
+    }
 ```
+#### Check more example in execution_test.go

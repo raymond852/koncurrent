@@ -114,4 +114,3 @@ func BenchmarkExecuteParallel_Pool(b *testing.B) {
 		_, _ = ExecuteSerial(NewTask(task1Func, pe), NewTask(task2Func, pe), NewTask(task3Func, pe)).Await(context.Background())
 	}
 }
-

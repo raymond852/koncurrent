@@ -81,7 +81,7 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 						}
 					}()
 				} else {
-					task.executor.Execute(ctx, task.taskFunc, j, resultsChn)
+					task.executor.Execute(ctx, taskFunc, j, resultsChn)
 				}
 			}
 			for range currTaskList {
@@ -121,7 +121,7 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 						return ret, err
 					}
 				} else {
-					task.executor.Execute(ctx, task.taskFunc, j, resultsChn)
+					task.executor.Execute(ctx, taskFunc, j, resultsChn)
 					select {
 					case taskResult := <-resultsChn:
 						execErr[j] = taskResult.err

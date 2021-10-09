@@ -5,7 +5,7 @@ The v3 library dramatically improve performance than v2 and v1 library by reduci
 
 
 ### Benchmark result
-Benchmark test on an AMD 2700X Ubuntu 20.04.3 LTS machine 
+Benchmark test on an AMD 2700X Ubuntu 20.04.3 LTS machine Go 1.16.8
 #### v1
 ```
 BenchmarkExecuteSerial_Immediate-16      	 1259301	       926.5 ns/op	     304 B/op	      14 allocs/op
@@ -26,12 +26,12 @@ BenchmarkExecuteParallel_Pool-16         	  254157	      4411 ns/op	     728 B/o
 ```
 #### v3
 ```
-BenchmarkExecuteSerial_Immediate-16      	 4001826	       285.4 ns/op	     168 B/op	       3 allocs/op
-BenchmarkExecuteSerial_Async-16          	  429555	      2589 ns/op	     168 B/op	       3 allocs/op
-BenchmarkExecuteSerial_Pool-16           	  449403	      2478 ns/op	     168 B/op	       3 allocs/op
-BenchmarkExecuteParallel_Immediate-16    	 4142961	       289.7 ns/op	     168 B/op	       3 allocs/op
-BenchmarkExecuteParallel_Async-16        	  378488	      3231 ns/op	     248 B/op	       4 allocs/op
-BenchmarkExecuteParallel_Pool-16         	  434558	      2569 ns/op	     168 B/op	       3 allocs/op
+BenchmarkExecuteSerial_Immediate-16              4078363               286.0 ns/op           168 B/op          3 allocs/op
+BenchmarkExecuteSerial_Async-16                   432781              2540 ns/op             168 B/op          3 allocs/op
+BenchmarkExecuteSerial_Pool-16                    452028              2473 ns/op             168 B/op          3 allocs/op
+BenchmarkExecuteParallel_Immediate-16            1586167               762.7 ns/op           248 B/op          4 allocs/op
+BenchmarkExecuteParallel_Async-16                 384945              3181 ns/op             248 B/op          4 allocs/op
+BenchmarkExecuteParallel_Pool-16                  425948              2701 ns/op             248 B/op          4 allocs/op
 ```
 
 ### Usage

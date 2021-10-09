@@ -12,6 +12,24 @@ const (
 
 type ExecutionResults [][]error
 
+func (er ExecutionResults) FlattenErrors() []error {
+	errCount := 0
+	for i := range er {
+		errCount += len(er[i])
+	}
+	ret := make([]error, errCount)
+	idx := 0
+	for i := range er {
+		for j := range er[i] {
+			if er[i][j] != nil {
+				ret[idx] = er[i][j]
+				idx += 1
+			}
+		}
+	}
+	return ret[:idx]
+}
+
 type Execution struct {
 	tasksList         [][]TaskExecution
 	executionTypeList []int
@@ -67,22 +85,9 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 			resultsChn := make(chan TaskResult, len(currTaskList))
 			for j, task := range currTaskList {
 				taskFunc := task.taskFunc
-				if task.executionType == taskExecutionTypeImmediate {
-					resultsChn <- TaskResult{
-						err: taskFunc(ctx),
-						id:  j,
-					}
-				} else if task.executionType == taskExecutionTypeNewGoRoutine {
-					index := j
-					go func() {
-						resultsChn <- TaskResult{
-							err: taskFunc(ctx),
-							id:  index,
-						}
-					}()
-				} else {
-					task.executor.Execute(ctx, taskFunc, j, resultsChn)
-				}
+				executor := task.executor
+				opts := task.options
+				executor.Execute(ctx, taskFunc, j, resultsChn, opts)
 			}
 			for range currTaskList {
 				select {
@@ -95,7 +100,9 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 			close(resultsChn)
 			for j := range execErr {
 				if execErr[j] != nil {
-					if err == nil {
+					if panicErr, ok := execErr[i].(PanicError); ok {
+						return ret, panicErr
+					} else if err == nil {
 						err = execErr[j]
 					} else {
 						err = fmt.Errorf("%s:%w", execErr[j], err)
@@ -103,31 +110,16 @@ func (e Execution) Await(ctx context.Context) (ExecutionResults, error) {
 				}
 			}
 		default:
-			resultsChn := make(chan TaskResult)
+			resultsChn := make(chan TaskResult, 1)
 			for j, task := range currTaskList {
 				taskFunc := task.taskFunc
-				if task.executionType == taskExecutionTypeImmediate {
-					execErr[j] = taskFunc(ctx)
-				} else if task.executionType == taskExecutionTypeNewGoRoutine {
-					go func() {
-						resultsChn <- TaskResult{
-							err: taskFunc(ctx),
-						}
-					}()
-					select {
-					case taskResult := <-resultsChn:
-						execErr[j] = taskResult.err
-					case <-ctx.Done():
-						return ret, err
-					}
-				} else {
-					task.executor.Execute(ctx, taskFunc, j, resultsChn)
-					select {
-					case taskResult := <-resultsChn:
-						execErr[j] = taskResult.err
-					case <-ctx.Done():
-						return ret, err
-					}
+				opts := task.options
+				task.executor.Execute(ctx, taskFunc, j, resultsChn, opts)
+				select {
+				case taskResult := <-resultsChn:
+					execErr[j] = taskResult.err
+				case <-ctx.Done():
+					return ret, err
 				}
 				if execErr[j] != nil {
 					close(resultsChn)

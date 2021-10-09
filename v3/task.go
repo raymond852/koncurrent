@@ -4,13 +4,19 @@ import (
 	"context"
 )
 
-const (
-	taskExecutionTypeImmediate = iota
-	taskExecutionTypeNewGoRoutine
-	taskExecutionTypeOther
-)
-
 type TaskFunc func(ctx context.Context) error
+
+type PanicError struct {
+	Stack []byte
+}
+
+func (e PanicError) Error() string {
+	return "panic:" + string(e.Stack)
+}
+
+type TaskExecutor interface {
+	Execute(ctx context.Context, taskFunc TaskFunc, taskId int, resultChn chan TaskResult, taskExecutionOpts TaskExecutionOptions)
+}
 
 type TaskResult struct {
 	err error
@@ -18,9 +24,26 @@ type TaskResult struct {
 }
 
 type TaskExecution struct {
-	executionType int
-	taskFunc      TaskFunc
-	executor      PoolExecutor
+	options  TaskExecutionOptions
+	taskFunc TaskFunc
+	executor TaskExecutor
+}
+
+type TaskExecutionOptions struct {
+	tracingSpanName  string
+	recoverFromPanic bool
+}
+
+func (t TaskExecution) Recover() TaskExecution {
+	ret := t
+	ret.options.recoverFromPanic = true
+	return ret
+}
+
+func (t TaskExecution) Tracing(spanName string) TaskExecution {
+	ret := t
+	ret.options.tracingSpanName = spanName
+	return ret
 }
 
 func (t TaskExecution) Execution() Execution {
@@ -29,22 +52,21 @@ func (t TaskExecution) Execution() Execution {
 
 func (t TaskFunc) Immediate() TaskExecution {
 	return TaskExecution{
-		executionType: taskExecutionTypeImmediate,
-		taskFunc:      t,
+		taskFunc: t,
+		executor: ImmediateExecutor{},
 	}
 }
 
 func (t TaskFunc) Async() TaskExecution {
 	return TaskExecution{
-		executionType: taskExecutionTypeNewGoRoutine,
-		taskFunc:      t,
+		taskFunc: t,
+		executor: AsyncExecutor{},
 	}
 }
 
 func (t TaskFunc) Pool(executor PoolExecutor) TaskExecution {
 	return TaskExecution{
-		executionType: taskExecutionTypeOther,
-		taskFunc:      t,
-		executor:      executor,
+		taskFunc: t,
+		executor: executor,
 	}
 }

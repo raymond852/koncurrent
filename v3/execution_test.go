@@ -3,6 +3,7 @@ package koncurrent
 import (
 	"context"
 	"errors"
+	"github.com/opentracing/opentracing-go"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 func TestExecuteSerial(t *testing.T) {
 	var time1, time2 *time.Time
+	var span opentracing.Span
 	var t1 TaskFunc = func(ctx context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 		now := time.Now()
@@ -17,6 +19,7 @@ func TestExecuteSerial(t *testing.T) {
 		return nil
 	}
 	var t2 TaskFunc = func(ctx context.Context) error {
+		span = opentracing.SpanFromContext(ctx)
 		time.Sleep(100 * time.Millisecond)
 		now := time.Now()
 		time2 = &now
@@ -24,9 +27,9 @@ func TestExecuteSerial(t *testing.T) {
 	}
 	pe := NewPoolExecutor(10, 10)
 	taskExecs := [][]TaskExecution{
-		{t1.Immediate(), t2.Immediate()},
-		{t1.Async(), t2.Async()},
-		{t1.Pool(pe), t2.Pool(pe)},
+		{t1.Immediate(), t2.Immediate().Tracing("test")},
+		{t1.Async(), t2.Async().Tracing("test")},
+		{t1.Pool(pe), t2.Pool(pe).Tracing("test")},
 	}
 	for i := range taskExecs {
 		iter, err := ExecuteSerial(taskExecs[i]...).Await(context.Background())
@@ -36,6 +39,7 @@ func TestExecuteSerial(t *testing.T) {
 		assertNotNil(t, time1)
 		assertNotNil(t, time2)
 		assertTrue(t, (*time2).Sub(*time1) >= 100*time.Millisecond)
+		assertTrue(t, span != nil)
 	}
 }
 
@@ -460,6 +464,7 @@ func TestExecution_Async(t *testing.T) {
 }
 
 func TestExecuteParallel_WithCancel(t *testing.T) {
+	var pe = NewPoolExecutor(2, 10)
 	outer := 1
 	var task1 TaskFunc = func(ctx context.Context) error {
 		time.Sleep(1000 * time.Millisecond)
@@ -490,6 +495,7 @@ func TestExecuteParallel_WithCancel(t *testing.T) {
 }
 
 func TestExecuteSerial_WithCancel(t *testing.T) {
+	var pe = NewPoolExecutor(2, 10)
 	outer := 1
 	var task1 TaskFunc = func(ctx context.Context) error {
 		time.Sleep(1000 * time.Millisecond)
@@ -603,3 +609,79 @@ func TestExecution_Switch(t *testing.T) {
 
 	assertEqual(t, taskResult, "defaultCase1")
 }
+
+func TestExecutionResults_FlattenErrors(t *testing.T) {
+	var t1 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t2 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t3 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t4 TaskFunc = func(ctx context.Context) error {
+		return errors.New("test")
+	}
+	iter, err := ExecuteSerial(
+		t1.Immediate().Tracing("t1").Recover(),
+		t2.Async(),
+	).ExecuteParallel(
+		t3.Immediate(),
+		t4.Async(),
+	).Await(context.Background())
+	assertTrue(t, len(iter.FlattenErrors()) == 1)
+	assertEqual(t, iter.FlattenErrors()[0].Error(), "test")
+	assertEqual(t, iter.FlattenErrors()[0], err)
+}
+
+func TestExecution_Panic(t *testing.T) {
+	var t1 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t2 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t3 TaskFunc = func(ctx context.Context) error {
+		return nil
+	}
+	var t4 TaskFunc = func(ctx context.Context) error {
+		panic("test")
+	}
+	pe := NewPoolExecutor(10, 10)
+	taskExecs := [][]TaskExecution{
+		{t1.Immediate(), t2.Immediate(), t3.Immediate(), t4.Immediate().Recover()},
+		{t1.Async(), t2.Async(), t3.Async(), t4.Async().Recover()},
+		{t1.Pool(pe), t2.Pool(pe), t3.Pool(pe), t4.Pool(pe).Recover()},
+	}
+	for i := range taskExecs {
+		iterErr, err := ExecuteParallel(taskExecs[i]...).
+			Await(context.Background())
+		_, ok := err.(PanicError)
+		assertTrue(t, ok)
+		assertEqual(t, len(iterErr.FlattenErrors()), 1)
+	}
+	for i := range taskExecs {
+		iterErr, err := ExecuteSerial(taskExecs[i]...).
+			Await(context.Background())
+		_, ok := err.(PanicError)
+		assertTrue(t, ok)
+		assertEqual(t, len(iterErr.FlattenErrors()), 1)
+	}
+	for i := range taskExecs {
+		iterErr, err := ExecuteSerial(taskExecs[i][:2]...).ExecuteParallel(taskExecs[i][2:]...).
+			Await(context.Background())
+		_, ok := err.(PanicError)
+		assertTrue(t, ok)
+		assertEqual(t, len(iterErr.FlattenErrors()), 1)
+	}
+	for i := range taskExecs {
+		iterErr, err := ExecuteParallel(taskExecs[i][:2]...).ExecuteSerial(taskExecs[i][2:]...).
+			Await(context.Background())
+		_, ok := err.(PanicError)
+		assertTrue(t, ok)
+		assertEqual(t, len(iterErr.FlattenErrors()), 1)
+	}
+}
+
+

@@ -24,6 +24,15 @@ BenchmarkExecuteParallel_Immediate-16    	  923436	      1159 ns/op	     400 B/o
 BenchmarkExecuteParallel_Async-16        	  287938	      4582 ns/op	     712 B/op	      20 allocs/op
 BenchmarkExecuteParallel_Pool-16         	  290116	      4016 ns/op	     712 B/op	      20 allocs/op
 ```
+#### optimized v2 branch
+```
+BenchmarkExecuteSerial_Immediate-16              2785822               421.7 ns/op           120 B/op          5 allocs/op
+BenchmarkExecuteSerial_Async-16                   380536              3064 ns/op             408 B/op          8 allocs/op
+BenchmarkExecuteSerial_Pool-16                    477312              2824 ns/op             408 B/op          8 allocs/op
+BenchmarkExecuteParallel_Immediate-16            2117505               543.6 ns/op           168 B/op          6 allocs/op
+BenchmarkExecuteParallel_Async-16                 348438              3392 ns/op             456 B/op          9 allocs/op
+BenchmarkExecuteParallel_Pool-16                  414778              2790 ns/op             456 B/op          9 allocs/op
+```
 #### v3
 ```
 BenchmarkExecuteSerial_Immediate-16              4078363               286.0 ns/op           168 B/op          3 allocs/op
